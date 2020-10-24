@@ -2,12 +2,15 @@
 
 namespace app\controllers;
 
+use app\models\Chat;
+use app\models\User;
 use Yii;
+use yii\data\ActiveDataProvider;
 use yii\filters\AccessControl;
 use yii\web\Controller;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\filters\VerbFilter;
-use app\models\LoginForm;
 use app\models\ContactForm;
 
 class SiteController extends Controller
@@ -55,64 +58,25 @@ class SiteController extends Controller
     }
 
     /**
-     * Displays homepage.
+     * Displays homepage with chat.
      *
      * @return string
      */
     public function actionIndex()
     {
-        return $this->render('index');
-    }
-
-    /**
-     * Login action.
-     *
-     * @return Response|string
-     */
-    public function actionLogin()
-    {
-        if (!Yii::$app->user->isGuest) {
-            return $this->goHome();
+        if(!Yii::$app->user->isGuest && Yii::$app->user->identity->isAdmin) {
+            $dataProvider = new ActiveDataProvider([
+                'query' => Chat::find()->orderBy('created_at DESC'),
+            ]);
+        } else {
+            $dataProvider = new ActiveDataProvider([
+                'query' => Chat::find()->where(['visible'=>1])->orderBy('created_at DESC'),
+            ]);
         }
 
-        $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            return $this->goBack();
-        }
-
-        $model->password = '';
-        return $this->render('login', [
-            'model' => $model,
-        ]);
-    }
-
-    /**
-     * Logout action.
-     *
-     * @return Response
-     */
-    public function actionLogout()
-    {
-        Yii::$app->user->logout();
-
-        return $this->goHome();
-    }
-
-    /**
-     * Displays contact page.
-     *
-     * @return Response|string
-     */
-    public function actionContact()
-    {
-        $model = new ContactForm();
-        if ($model->load(Yii::$app->request->post()) && $model->contact(Yii::$app->params['adminEmail'])) {
-            Yii::$app->session->setFlash('contactFormSubmitted');
-
-            return $this->refresh();
-        }
-        return $this->render('contact', [
-            'model' => $model,
+        return $this->render('index', [
+            'dataProvider' => $dataProvider,
+            'title' => 'Простой чат'
         ]);
     }
 
@@ -124,5 +88,91 @@ class SiteController extends Controller
     public function actionAbout()
     {
         return $this->render('about');
+    }
+
+    /**
+     * Displays login page.
+     *
+     * @return string
+     */
+    public function actionLogin()
+    {
+        return $this->render('login');
+    }
+
+    /**
+     * Creates a new Chat model.
+     *
+     * @return mixed
+     */
+    public function actionCreate()
+    {
+        $model = new Chat();
+        $model->message = Yii::$app->request->post('message');
+        $model->user_id = Yii::$app->user->getId();
+        if ($model->validate() && $model->save()) {
+            Yii::$app->session->setFlash('success', "Сообщение отправлено");
+        } else
+        Yii::$app->session->setFlash('error', "Нельзя отправлять пустое сообщение");
+        return $this->redirect(['index']);
+    }
+
+    /**
+     * Deletes an existing Chat model.
+     *
+     * @param integer $id
+     * @return mixed
+     */
+    public function actionSetVisible($id)
+    {
+        if (($model = Chat::findOne($id)) !== null) {
+            $model->setVisible();
+        }
+        return $this->redirect(['/']);
+    }
+
+    /**
+     * Displays homepage with hide messages
+     *
+     * @return string
+     */
+    public function actionGetHide()
+    {
+        $dataProvider = new ActiveDataProvider([
+            'query' => Chat::find()->where(['visible'=>0])->orderBy('created_at DESC'),
+        ]);
+        return $this->render('index_hide', [
+            'dataProvider' => $dataProvider,
+            'title' => 'Скрытые сообщения'
+        ]);
+    }
+
+    /**
+     * Displays users list.
+     *
+     * @return string
+     */
+    public function actionUsers()
+    {
+        $dataProvider = new ActiveDataProvider([
+            'query' => User::find()->orderBy('id'),
+        ]);
+        return $this->render('users', [
+            'dataProvider' => $dataProvider,
+            'title' => 'Пользователи'
+        ]);
+    }
+
+    /**
+     * Change user role
+     *
+     * @return string
+     */
+    public function actionChangeRole($uid)
+    {
+        if (($model = User::findOne(['uid' => $uid])) !== null) {
+            $model->changeRole();
+        }
+        return $this->redirect(['site/users']);
     }
 }

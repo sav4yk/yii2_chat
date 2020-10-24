@@ -2,38 +2,42 @@
 
 namespace app\models;
 
-class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
+use Yii;
+use yii\db\ActiveQuery;
+use yii\db\ActiveRecord;
+use yii\web\IdentityInterface;
+
+/**
+ * This is the model class for table "user".
+ *
+ * @property int $id
+ * @property string $uid
+ * @property string $first_name
+ * @property string $last_name
+ * @property string $photo
+ * @property int|null $isAdmin
+ *
+ * @property-read void $authKey
+ * @property-read string $userName
+ * @property-read string $fullName
+ * @property Chat[] $chats
+ */
+class User extends ActiveRecord implements IdentityInterface
 {
-    public $id;
-    public $username;
-    public $password;
-    public $authKey;
-    public $accessToken;
-
-    private static $users = [
-        '100' => [
-            'id' => '100',
-            'username' => 'admin',
-            'password' => 'admin',
-            'authKey' => 'test100key',
-            'accessToken' => '100-token',
-        ],
-        '101' => [
-            'id' => '101',
-            'username' => 'demo',
-            'password' => 'demo',
-            'authKey' => 'test101key',
-            'accessToken' => '101-token',
-        ],
-    ];
-
+    /**
+     * {@inheritdoc}
+     */
+    public static function tableName()
+    {
+        return 'user';
+    }
 
     /**
      * {@inheritdoc}
      */
     public static function findIdentity($id)
     {
-        return isset(self::$users[$id]) ? new static(self::$users[$id]) : null;
+        return User::findOne($id);
     }
 
     /**
@@ -41,34 +45,83 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
      */
     public static function findIdentityByAccessToken($token, $type = null)
     {
-        foreach (self::$users as $user) {
-            if ($user['accessToken'] === $token) {
-                return new static($user);
-            }
-        }
 
-        return null;
-    }
-
-    /**
-     * Finds user by username
-     *
-     * @param string $username
-     * @return static|null
-     */
-    public static function findByUsername($username)
-    {
-        foreach (self::$users as $user) {
-            if (strcasecmp($user['username'], $username) === 0) {
-                return new static($user);
-            }
-        }
-
-        return null;
     }
 
     /**
      * {@inheritdoc}
+     */
+    public function rules()
+    {
+        return [
+            [['uid', 'first_name', 'last_name', 'photo'], 'required'],
+            [['isAdmin'], 'integer'],
+            [['uid', 'first_name', 'last_name', 'photo'], 'string', 'max' => 255],
+        ];
+    }
+
+    /**
+     * Gets query for [[Chats]].
+     *
+     * @return ActiveQuery
+     */
+    public function getChats()
+    {
+        return $this->hasMany(Chat::className(), ['user_id' => 'id']);
+    }
+
+    /**
+     * Login with use VK API
+     *
+     * @param $uid
+     * @param $first_name
+     * @param $last_name
+     * @param $photo
+     * @param $hash
+     * @return bool
+     */
+    public function loginFromVk($uid, $first_name, $last_name, $photo, $hash)
+    {
+        $user = User::findOne(['uid' => $uid]);
+        if ($user && $this->checkHash($hash, $uid)) {
+            return Yii::$app->user->login($user);
+        } else {
+            $this->uid = $uid;
+            $this->first_name = $first_name;
+            $this->last_name = $last_name;
+            $this->photo = $photo;
+            if ($this->checkHash($hash, $uid)) {
+                $this->create();
+                return Yii::$app->user->login($this);
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Check vk-hash
+     *
+     * @param $hash
+     * @param $uid
+     * @return bool
+     */
+    public function checkHash($hash, $uid)
+    {
+        return md5(Yii::$app->params['vk_api_id'] . $uid . Yii::$app->params['vk_key']) == $hash;
+    }
+
+    /**
+     * Create new user
+     *
+     * @return bool
+     */
+    public function create()
+    {
+        return $this->save(false);
+    }
+
+    /**
+     * @return int|string
      */
     public function getId()
     {
@@ -76,29 +129,71 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return string|void
      */
     public function getAuthKey()
     {
-        return $this->authKey;
+
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $authKey
+     * @return bool|void
      */
     public function validateAuthKey($authKey)
     {
-        return $this->authKey === $authKey;
+
     }
 
     /**
-     * Validates password
-     *
-     * @param string $password password to validate
-     * @return bool if password provided is valid for current user
+     * Get user name
+     * @return string
      */
-    public function validatePassword($password)
+    public function getUserName()
     {
-        return $this->password === $password;
+        return $this->first_name;
+    }
+
+    /**
+     * Get user photo
+     *
+     * @return string
+     */
+    public function getPhoto()
+    {
+        return $this->photo;
+    }
+
+    /**
+     * Get full user name
+     *
+     * @return string
+     */
+    public function getFullName()
+    {
+        return $this->first_name . ' ' . $this->last_name;
+    }
+
+    /**
+     * Check user role
+     *
+     * @return int|null
+     */
+    public function getIsAdmin()
+    {
+        return $this->isAdmin;
+    }
+
+    /**
+     * Change user role
+     *
+     * @return bool
+     */
+    public function changeRole()
+    {
+        if (Yii::$app->user->identity->isAdmin) {
+            $this->isAdmin = !$this->isAdmin;
+            return $this->save(false);
+        }
     }
 }

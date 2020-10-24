@@ -21,15 +21,6 @@ body {
     padding-top: 20px;
 }
 
-.jumbotron {
-    text-align: center;
-    background-color: transparent;
-}
-
-.jumbotron .btn {
-    font-size: 21px;
-    padding: 14px 24px;
-}
 
 .not-set {
     color: #c55;
@@ -113,3 +104,52 @@ a.desc:after {
 .nav > li > form > button.logout:focus {
     outline: none;
 }
+
+.message {
+    width: 500px;
+    min-height:120px;
+    border-radius:11px;
+    box-shadow: 1px 1px 10px #C0C0C0;
+    position:relative;
+    background:#F5F5F5;
+    margin: 5px;
+    padding: 15px;
+}
+
+.admin {
+    background: #cdecc2;
+}
+
+.message .ava {
+    float:left;
+    margin-right: 15px;
+    width: 90px;
+    height: 90px;
+}
+
+.message .ava img{
+    width: 90px;
+    height: 90px;
+    border-radius:25px;
+}
+
+
+.message .title {
+    font-size: 0.9em;
+}
+.message .text {
+    margin-top:15px;
+}
+
+.message textarea {
+    min-height: 50px;
+    width: 320px;
+}
+
+.message button {
+    float:right;
+    min-height: 50px;
+}
+
+
+
